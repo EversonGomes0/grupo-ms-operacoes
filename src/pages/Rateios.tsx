@@ -100,6 +100,7 @@ const centrosResultado = [
   'HYDRO - AGUA MINERAL',
   'PRJ 014 - INFRAESTRUTURA OPERACIONAL',
   'TERMINAL I',
+  'CONTROLADORIA',
 ];
 
 const Rateios = () => {
