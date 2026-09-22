@@ -85,6 +85,7 @@ const centrosResultado = [
   'HYDRO - BACIA ÁREA 82',
   'FAZENDA',
   'MANUTENÇÃO',
+  'CONTROLADORIA',
   'SESMT',
   'MS GRANEIS',
   'VALE - DRENAGEM SUPERFICIAL',
