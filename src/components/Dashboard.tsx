@@ -337,8 +337,6 @@ const Dashboard = () => {
           </div>
 
           <main className="flex-1 p-6 space-y-6">
-            {/* BANNER MAIO AMARELO */}
-          
             {/* Filtros */}
             <Card className="bg-slate-900/40 border-slate-800">
               <CardContent className="pt-6">
@@ -451,18 +449,7 @@ const Dashboard = () => {
               </div>
               
               <div className="flex flex-col gap-6">
-                <Card className="bg-gradient-to-br from-yellow-600/20 to-amber-900/30 border-2 border-yellow-500/40 p-6 flex-1 flex flex-col items-center justify-center text-center">
-                  <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 text-yellow-400">
-                    <TrafficCone className="w-8 h-8" />
-                  </div>
-                  <h4 className="text-slate-300 text-xs uppercase font-bold tracking-wider mb-1">MAIO AMARELO</h4>
-                  <p className="text-yellow-400 text-sm font-bold mb-2">#PELASVIDASNOTRÂNSITO</p>
-                  <p className="text-xs text-slate-400 mt-2">Sua atitude salva vidas!</p>
-                  <Badge className="mt-3 bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
-                    🌟 Respeito e Responsabilidade
-                  </Badge>
-                </Card>
-
+                
                 <Card className="bg-slate-900/40 border-slate-800 p-4">
                    <h4 className="text-xs font-semibold text-slate-300 uppercase mb-3">Acesso Rápido</h4>
                    <div className="space-y-2">
@@ -538,31 +525,7 @@ const Dashboard = () => {
         </div>
 
         <div className="p-4 space-y-6">
-          {/* Banner Mobile - Maio Amarelo */}
-          {!bannerFechado && (
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-yellow-600/30 via-amber-900/40 to-yellow-600/30 border-2 border-yellow-500/50 p-4">
-              <button 
-                onClick={() => setBannerFechado(true)}
-                className="absolute top-2 right-2 text-slate-400 hover:text-white"
-              >
-                <X className="h-3 w-3" />
-              </button>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <TrafficCone className="w-5 h-5 text-yellow-400" />
-                  <span className="text-xs font-black text-yellow-400 tracking-wide">MAIO AMARELO 2025</span>
-                </div>
-                <p className="text-[11px] text-slate-200 font-semibold">🌍 Juntos Salvamos Vidas</p>
-                <p className="text-[10px] text-slate-300">Prevenção de Acidentes no Trânsito • Sua atitude faz a diferença</p>
-                <div className="flex flex-wrap gap-1 pt-1">
-                  <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[9px]">🛑 Pare e Pense</Badge>
-                  <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[9px]">🚦 Respeito</Badge>
-                  <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[9px]">🚗 Responsabilidade</Badge>
-                </div>
-              </div>
-            </div>
-          )}
-
+        
           <Card className="bg-slate-900 border border-slate-800">
             <CardContent className="pt-4 space-y-3">
                <div>
