@@ -407,7 +407,7 @@ const LineChartSVG = ({ data, height = 320 }: { data: ChartDataPoint[]; height?:
 // ============================================
 const HomemHora = () => {
   const navigate = useNavigate();
-  const { userProfile } = useAuth();
+  const { user, userProfile } = useAuth();
   const { toast } = useToast();
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [anoReferencia] = useState<number>(new Date().getFullYear());
@@ -476,21 +476,27 @@ const HomemHora = () => {
     }
   };
 
-  // Efeito Ajustado: Fallback seguro caso userProfile.id atrase para carregar
+  const getCurrentUserId = async (): Promise<string | null> => {
+    if (user?.id) return user.id;
+    if (userProfile?.user_id) return userProfile.user_id;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id ?? null;
+  };
+
+  // Efeito Ajustado: usa o user_id real da sessão/auth, não o id do perfil
   useEffect(() => {
     let isMounted = true;
 
     const initFetch = async () => {
-      if (userProfile?.id) {
-        if (isMounted) await carregarDados(userProfile.id, anoReferencia);
+      const authUserId = user?.id ?? userProfile?.user_id ?? (await supabase.auth.getSession()).data.session?.user?.id;
+
+      if (authUserId && isMounted) {
+        await carregarDados(authUserId, anoReferencia);
         return;
       }
 
-      // Se userProfile ainda não veio do hook, busca a sessão diretamente
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id && isMounted) {
-        await carregarDados(session.user.id, anoReferencia);
-      } else if (isMounted) {
+      if (isMounted) {
         setLoading(false);
       }
     };
@@ -500,10 +506,10 @@ const HomemHora = () => {
     return () => {
       isMounted = false;
     };
-  }, [userProfile?.id, anoReferencia]);
+  }, [user?.id, userProfile?.user_id, anoReferencia]);
 
   const criarPeriodosPadrao = async () => {
-    const targetUserId = userProfile?.id || (await supabase.auth.getSession()).data.session?.user?.id;
+    const targetUserId = await getCurrentUserId();
     if (!targetUserId) return;
 
     try {
@@ -595,7 +601,7 @@ const HomemHora = () => {
   };
 
   const handleSaveAll = async () => {
-    const targetUserId = userProfile?.id || (await supabase.auth.getSession()).data.session?.user?.id;
+    const targetUserId = await getCurrentUserId();
     if (!targetUserId) return;
 
     try {
