@@ -98,6 +98,7 @@ const centrosResultado = [
   'FAZENDA',
   'MANUTENÇÃO',
   'CONTROLADORIA',
+  'COMERCIAL',
   'SESMT',
   'MS GRANEIS',
   'VALE - DRENAGEM SUPERFICIAL',
