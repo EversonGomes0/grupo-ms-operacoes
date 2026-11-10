@@ -10,10 +10,20 @@ import { Badge } from '@/components/ui/badge';
 import { 
   ArrowLeft, Plus, Search, Filter, Calendar, Clock, Ship, Factory, Warehouse, Building, 
   BarChart3, Users, UserX, Menu, RefreshCw, Database, Eye, Loader2, LucideIcon, 
-  Download, FileText, X, Package, ChevronDown, ChevronRight
+  Download, FileText, X, Package, ChevronDown, ChevronRight, Trash2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import * as XLSX from 'xlsx';
 
 // --- 1. INTERFACES E TIPOS ---
@@ -406,7 +416,10 @@ const TabelaOperacao: React.FC<{
   operacao: OperacaoCompleta | null; 
   formatarDataBR: (d: string) => string; 
   formatarHoras: (h: number) => string;
-}> = ({ operacao, formatarDataBR, formatarHoras }) => {
+  isAdmin: boolean;
+  onDelete: () => void;
+  isDeleting: boolean;
+}> = ({ operacao, formatarDataBR, formatarHoras, isAdmin, onDelete, isDeleting }) => {
   if (!operacao) {
     return (
       <Card className="h-full bg-slate-900 border border-slate-800 flex flex-col items-center justify-center shadow-xl">
@@ -473,6 +486,19 @@ const TabelaOperacao: React.FC<{
               </div>
             )}
           </div>
+          {isAdmin && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={isDeleting}
+              onClick={onDelete}
+              className="flex-shrink-0"
+            >
+              <Trash2 className="h-4 w-4" />
+              Excluir operação
+            </Button>
+          )}
         </div>
       </CardHeader>
 
@@ -641,6 +667,7 @@ const PainelLateral: React.FC<{ ajudantes: Ajudante[], ausencias: Ausencia[] }> 
 const RelatorioTransporte = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAdmin, error: adminError } = useIsAdmin();
   
   const [operacaoSelecionada, setOperacaoSelecionada] = useState<string>('TODOS');
   const [operacaoIdSelecionado, setOperacaoIdSelecionado] = useState<string | null>(null);
@@ -656,6 +683,8 @@ const RelatorioTransporte = () => {
   const [filtroAplicado, setFiltroAplicado] = useState({ data: '', hora: 'Todos', operador: '' });
   const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeletingOperation, setIsDeletingOperation] = useState(false);
 
   const [gruposExpandidos, setGruposExpandidos] = useState<Set<string>>(new Set(['TODOS']));
 
@@ -1047,6 +1076,63 @@ const RelatorioTransporte = () => {
     operacaoIdSelecionado ? operacoesFiltradas.find(o => o.id === operacaoIdSelecionado) || null : null, 
   [operacoesFiltradas, operacaoIdSelecionado]);
 
+  useEffect(() => {
+    if (adminError) {
+      toast({
+        title: 'Erro ao verificar permissões',
+        description: 'Não foi possível confirmar o acesso de administrador.',
+        variant: 'destructive'
+      });
+    }
+  }, [adminError, toast]);
+
+  const handleDeleteOperation = async () => {
+    if (!operacaoIdSelecionado) return;
+
+    setIsDeletingOperation(true);
+    try {
+      const { data, error } = await supabase
+        .from('registro_operacoes')
+        .delete()
+        .eq('id', operacaoIdSelecionado)
+        .select('id');
+
+      if (error) {
+        if (error.code === '23503') {
+          throw new Error(
+            'Há registros em base_equipamentos_operacoes vinculados a esta operação. Nenhum dado foi apagado.'
+          );
+        }
+        throw error;
+      }
+
+      if (!data?.length) {
+        toast({
+          title: 'Operação não excluída',
+          description: 'O registro não existe mais ou a permissão de exclusão não foi liberada.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setOperacoes(prev => prev.filter(operacao => operacao.id !== operacaoIdSelecionado));
+      setOperacaoIdSelecionado(null);
+      setDeleteDialogOpen(false);
+      toast({
+        title: 'Operação excluída',
+        description: 'O registro e seus dados vinculados foram removidos do banco de dados.'
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao excluir operação',
+        description: error instanceof Error ? error.message : 'Não foi possível excluir a operação.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeletingOperation(false);
+    }
+  };
+
   return (
     <>
       <style>{`body { margin: 0; background-color: #020617; }`}</style>
@@ -1207,7 +1293,14 @@ const RelatorioTransporte = () => {
             ) : (
               <div className="flex-1 flex gap-4 min-h-0">
                  <div className="flex-[3] min-w-0">
-                   <TabelaOperacao operacao={operacaoAtual} formatarDataBR={formatarDataBR} formatarHoras={formatarHoras} />
+                   <TabelaOperacao
+                     operacao={operacaoAtual}
+                     formatarDataBR={formatarDataBR}
+                     formatarHoras={formatarHoras}
+                     isAdmin={isAdmin}
+                     onDelete={() => setDeleteDialogOpen(true)}
+                     isDeleting={isDeletingOperation}
+                   />
                  </div>
                  <div className="flex-1 min-w-[280px] max-w-[380px]">
                    <PainelLateral ajudantes={operacaoAtual?.ajudantes || []} ausencias={operacaoAtual?.ausencias || []} />
@@ -1217,6 +1310,33 @@ const RelatorioTransporte = () => {
           </div>
         </div>
       </div>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-slate-900 border-slate-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Excluir operação do relatório?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              A operação e os equipamentos, ajudantes e ausências vinculados serão removidos pelo banco.
+              A exclusão pode ser bloqueada se houver vínculos que precisem ser preservados. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isDeletingOperation}
+              className="bg-slate-800 text-white border-slate-700 hover:bg-slate-700"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeletingOperation}
+              onClick={handleDeleteOperation}
+            >
+              {isDeletingOperation ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir operação'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

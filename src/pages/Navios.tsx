@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,15 @@ import {
   BarChart3, Plus, Pencil, ArrowLeft, Loader2, Home, Activity,
   Search, Filter, XCircle, Save, Trash2, ChevronDown
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -45,6 +55,7 @@ const tiposCarga = [
 
 const Navios = () => {
   const { userProfile, signOut } = useAuth();
+  const { isAdmin, error: adminError } = useIsAdmin();
   const { hasUnread } = useNotifications();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -79,6 +90,8 @@ const Navios = () => {
   });
   const [cargaDropdownOpen, setCargaDropdownOpen] = useState(false);
   const [isSavingNavio, setIsSavingNavio] = useState(false);
+  const [deleteNavioDialogOpen, setDeleteNavioDialogOpen] = useState(false);
+  const [isDeletingNavio, setIsDeletingNavio] = useState(false);
 
   // Produção diária do navio selecionado
   const [producaoPorDia, setProducaoPorDia] = useState<ProducaoDia[]>([]);
@@ -227,6 +240,62 @@ const Navios = () => {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
     } finally {
       setIsSavingNavio(false);
+    }
+  };
+
+  useEffect(() => {
+    if (adminError) {
+      toast({
+        title: 'Erro ao verificar permissões',
+        description: 'Não foi possível confirmar o acesso de administrador.',
+        variant: 'destructive'
+      });
+    }
+  }, [adminError, toast]);
+
+  const handleDeleteNavio = async () => {
+    if (!selectedNavioId) return;
+
+    setIsDeletingNavio(true);
+    try {
+      const { data, error } = await supabase
+        .from('navios')
+        .delete()
+        .eq('id', selectedNavioId)
+        .select('id');
+
+      if (error) {
+        if (error.code === '23503') {
+          throw new Error(
+            'Há registros vinculados em base_equipamentos_operacoes que impedem a exclusão. Nenhum dado foi apagado.'
+          );
+        }
+        throw error;
+      }
+
+      if (!data?.length) {
+        toast({
+          title: 'Navio não excluído',
+          description: 'O navio não existe mais ou a permissão de exclusão não foi liberada.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setViagens(prev => prev.filter(viagem => viagem.id !== selectedNavioId));
+      setSelectedNavioId(null);
+      setNavioData(null);
+      setProducaoPorDia([]);
+      setDeleteNavioDialogOpen(false);
+      toast({ title: 'Navio excluído', description: 'O navio foi removido do banco de dados.' });
+    } catch (error) {
+      toast({
+        title: 'Erro ao excluir navio',
+        description: error instanceof Error ? error.message : 'Não foi possível excluir o navio.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeletingNavio(false);
     }
   };
 
@@ -502,9 +571,23 @@ const Navios = () => {
           <div className="w-[480px] flex flex-col bg-slate-900/30 overflow-y-auto">
             {selectedNavioId ? (
               <div className="flex-1 p-4 space-y-4">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <Pencil className="h-4 w-4 text-blue-400" /> Detalhes do Navio
-                </h3>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <Pencil className="h-4 w-4 text-blue-400" /> Detalhes do Navio
+                  </h3>
+                  {isAdmin && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={isDeletingNavio}
+                      onClick={() => setDeleteNavioDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir Navio
+                    </Button>
+                  )}
+                </div>
 
                 {/* Formulário de edição */}
                 <form onSubmit={handleSaveNavio} className="space-y-4">
@@ -823,7 +906,21 @@ const Navios = () => {
           {/* Detalhes mobile (abaixo da lista) */}
           {selectedNavioId && (
             <div className="space-y-4 mt-6 border-t border-slate-800 pt-4">
-              <h3 className="text-white font-bold">Detalhes</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-white font-bold">Detalhes</h3>
+                {isAdmin && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    disabled={isDeletingNavio}
+                    onClick={() => setDeleteNavioDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir Navio
+                  </Button>
+                )}
+              </div>
               {/* Versão simplificada mobile: apenas campos essenciais e produção */}
               <Card className="bg-slate-900 border-slate-800">
                 <CardContent className="p-4 space-y-3">
@@ -899,6 +996,33 @@ const Navios = () => {
             </div>
           )}
         </div>
+        <AlertDialog open={deleteNavioDialogOpen} onOpenChange={setDeleteNavioDialogOpen}>
+          <AlertDialogContent className="bg-slate-900 border-slate-800">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">Confirmar exclusão do navio</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-400">
+                A produção diária vinculada será removida pelo banco. Os relatórios de transporte permanecerão,
+                mas deixarão de apontar para este navio. Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                disabled={isDeletingNavio}
+                className="bg-slate-800 text-white border-slate-700 hover:bg-slate-700"
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isDeletingNavio}
+                onClick={handleDeleteNavio}
+              >
+                {isDeletingNavio ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir Navio'}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
